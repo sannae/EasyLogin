@@ -1,14 +1,19 @@
 ﻿using EasyLogin.Models;
+using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Claims;
+using System.Web.Caching;
 using System.Web.Http;
+using System.Web.UI.WebControls;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace EasyLogin.Controllers
@@ -19,31 +24,46 @@ namespace EasyLogin.Controllers
         public JObject Post(LoginModel login)
         {
             var output = new JObject();
+
+            if (!CheckUserLogin(login.Email, login.Password))
+            {
+                output["result"] = "KO";
+                return output;
+            }
+
             output["result"] = "OK";
-
-            List<LoginModel> allUsers = AuthorizedUsers();
-            LoginModel selectedUser = allUsers.Where(u => u.Email.Equals(login.Email)).FirstOrDefault();
-
-            // Check if email is in list
-            if (selectedUser == null)
-            {
-                output["result"] = "KO";
-                return output;
-            }
-
-            // Encode password using Base64
-            string encodedPassword = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(login.Password));
-
-            // Check password
-            if (!encodedPassword.Equals(selectedUser.Password))
-            {
-                output["result"] = "KO";
-                return output;
-            }
-
             return output;
         }
 
+        /// <summary>
+        /// Validates the user login based on email and password
+        /// </summary>
+        /// <param name="email"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        private bool CheckUserLogin(string email, string password)
+        {
+            List<LoginModel> allUsers = AuthorizedUsers();
+            LoginModel selectedUser = allUsers.Where(u => u.Email.Equals(email)).FirstOrDefault();
+
+            // Check if email is in list
+            if (selectedUser == null)
+                return false;
+
+            // Encode password using Base64
+            string encodedPassword = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(password));
+
+            // Check password
+            if (!encodedPassword.Equals(selectedUser.Password))
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Retrieves the list of authorized users from the JSON users file
+        /// </summary>
+        /// <returns></returns>
         private List<LoginModel> AuthorizedUsers()
         {
             // Users list file location
@@ -52,6 +72,31 @@ namespace EasyLogin.Controllers
             string usersFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, usersJsonFilePath);
 
             return JsonConvert.DeserializeObject<List<LoginModel>>(File.ReadAllText(usersFullPath));
+        }
+
+        /// <summary>
+        /// Returns a JWT token based on user email
+        /// For the sake of simplicity, expiration is not handled here.
+        /// Source: https://stackoverflow.com/a/40284152/11935591
+        /// </summary>
+        /// <param name="email"></param>
+        /// <returns></returns>
+        private string GenerateJwtToken(string email)
+        {
+            JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+
+            // All the attributes related to the token
+            SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.Name, email)
+                })
+            };
+            SecurityToken securityToken = tokenHandler.CreateToken(tokenDescriptor);
+            string token = tokenHandler.WriteToken(securityToken);
+
+            return token;
         }
     }
 }
