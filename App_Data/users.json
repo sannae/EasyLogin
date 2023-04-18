@@ -1,0 +1,18 @@
+﻿[
+  {
+    "id": 20,
+    "email": "admin@test.it",
+    "password": "YWRtaW4xMjM0"
+  },
+  {
+    "id": 500,
+    "email": "mario.rossi@test.it",
+    "password": "bWFyaW8xMjM0"
+  },
+  {
+    "id": 655,
+    "email": "carlo.bianchi@test.it",
+    "password": "Y2FybG8xMjM0"
+  }
+
+]
