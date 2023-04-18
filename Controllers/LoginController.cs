@@ -31,7 +31,8 @@ namespace EasyLogin.Controllers
                 return output;
             }
 
-            output["result"] = "OK";
+            output["result"] = GenerateJwtToken(login.Email);
+
             return output;
         }
 
@@ -48,6 +49,10 @@ namespace EasyLogin.Controllers
 
             // Check if email is in list
             if (selectedUser == null)
+                return false;
+
+            // Check if user has a valid password
+            if (selectedUser.Password.IsNullOrEmpty())
                 return false;
 
             // Encode password using Base64
@@ -76,7 +81,7 @@ namespace EasyLogin.Controllers
 
         /// <summary>
         /// Returns a JWT token based on user email
-        /// For the sake of simplicity, expiration is not handled here.
+        /// For the sake of simplicity, expiration and secret key are not handled here.
         /// Source: https://stackoverflow.com/a/40284152/11935591
         /// </summary>
         /// <param name="email"></param>
@@ -85,16 +90,23 @@ namespace EasyLogin.Controllers
         {
             JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
 
-            // All the attributes related to the token
+            // Attributes related to the token
             SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim(ClaimTypes.Name, email)
+                    new Claim(ClaimTypes.Email, email)
                 })
             };
             SecurityToken securityToken = tokenHandler.CreateToken(tokenDescriptor);
             string token = tokenHandler.WriteToken(securityToken);
+
+            // Just checking email in token... not really sure it's the best way
+            var emailInJwtToken = (new JwtSecurityTokenHandler()).ReadJwtToken(token).Claims
+                .Where(t => t.Type == "email").FirstOrDefault()
+                .Value;
+            if (!emailInJwtToken.Equals(email))
+                throw new Exception("Could not generate token out of provided email");
 
             return token;
         }
