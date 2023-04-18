@@ -20,18 +20,16 @@ namespace EasyLogin.Controllers
 {
     public class LoginController : ApiController
     {
+        private const string usersJsonFilePath = @"App_Data\users.json";
+
         // POST api/login
         public JObject Post(LoginModel login)
         {
             var output = new JObject();
 
-            if (!CheckUserLogin(login.Email, login.Password))
-            {
-                output["result"] = "KO";
-                return output;
-            }
-
-            output["result"] = GenerateJwtToken(login.Email);
+            output["result"] = CheckUserLogin(login.Email, login.Password) ?
+                GenerateJwtToken(login.Email) : 
+                "KO";
 
             return output;
         }
@@ -44,10 +42,11 @@ namespace EasyLogin.Controllers
         /// <returns></returns>
         private bool CheckUserLogin(string email, string password)
         {
+            // Read users from file
             List<LoginModel> allUsers = AuthorizedUsers();
-            LoginModel selectedUser = allUsers.Where(u => u.Email.Equals(email)).FirstOrDefault();
 
-            // Check if email is in list
+            // Check if user is in list
+            LoginModel selectedUser = allUsers.Where(u => u.Email.Equals(email)).FirstOrDefault();
             if (selectedUser == null)
                 return false;
 
@@ -55,10 +54,8 @@ namespace EasyLogin.Controllers
             if (selectedUser.Password.IsNullOrEmpty())
                 return false;
 
-            // Encode password using Base64
-            string encodedPassword = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(password));
-
             // Check password
+            string encodedPassword = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(password));
             if (!encodedPassword.Equals(selectedUser.Password))
                 return false;
 
@@ -72,8 +69,6 @@ namespace EasyLogin.Controllers
         private List<LoginModel> AuthorizedUsers()
         {
             // Users list file location
-            string usersJsonFilePath = @"App_Data\users.json";
-
             string usersFullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, usersJsonFilePath);
 
             return JsonConvert.DeserializeObject<List<LoginModel>>(File.ReadAllText(usersFullPath));
@@ -101,7 +96,8 @@ namespace EasyLogin.Controllers
             SecurityToken securityToken = tokenHandler.CreateToken(tokenDescriptor);
             string token = tokenHandler.WriteToken(securityToken);
 
-            // Just checking email in token... not really sure it's the best way
+            // Just checking email in token
+            // TODO: not really sure if it's the best way
             var emailInJwtToken = (new JwtSecurityTokenHandler()).ReadJwtToken(token).Claims
                 .Where(t => t.Type == "email").FirstOrDefault()
                 .Value;
